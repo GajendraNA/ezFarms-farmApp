@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:farmer/util/ipfile.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class RegisterPage extends StatefulWidget {
   @override
@@ -7,10 +11,77 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _showMessage(String message, {bool success = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isLoading = true);
+
+    final farmer = {
+      "name": _nameController.text.trim(),
+      "address": _addressController.text.trim(),
+      "phone": _phoneController.text.trim(),
+      "email": _emailController.text.trim(),
+      "password": _passwordController.text,
+    };
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse(registerFarmerUrl),
+            headers: <String, String>{
+              'Content-Type': 'application/json; charset=UTF-8',
+            },
+            body: jsonEncode(farmer),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _showMessage("Registered successfully. Please log in.", success: true);
+        if (mounted) Navigator.pop(context);
+      } else {
+        // The backend fails when the email already exists (it must be unique).
+        _showMessage("Registration failed. This email may already be registered.");
+      }
+    } on TimeoutException {
+      _showMessage("Server is not responding. Check the IP in ipfile.dart.");
+    } catch (error) {
+      print('Error: $error');
+      _showMessage("Could not connect to server. Check the IP in ipfile.dart.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   SizedBox(height: 20),
                   TextFormField(
-                    controller: _emailController,
+                    controller: _nameController,
                     decoration: InputDecoration(
                       labelText: 'Name',
                       border: OutlineInputBorder(),
@@ -47,28 +118,29 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   SizedBox(height: 20),
                   TextFormField(
-                    controller: _emailController,
+                    controller: _addressController,
                     decoration: InputDecoration(
                       labelText: 'Address',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return 'Please enter your address';
                       }
                       return null;
                     },
                   ),
                   SizedBox(height: 20),
                   TextFormField(
-                    controller: _emailController,
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
                       labelText: 'Phone number',
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return 'Please enter your phone number';
                       }
                       return null;
                     },
@@ -76,6 +148,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   SizedBox(height: 20),
                   TextFormField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: 'Email',
                       border: OutlineInputBorder(),
@@ -119,18 +192,19 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        _formKey.currentState!.save();
-                        Navigator.pushReplacementNamed(context, '/login');
-                      }
-                    },
-                    child: Text('Register'),
+                    onPressed: _isLoading ? null : _register,
+                    child: _isLoading
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('Register'),
                   ),
                   SizedBox(height: 10),
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context, '/login');
+                      Navigator.pop(context);
                     },
                     child: Text('Already have an account? Login'),
                   ),

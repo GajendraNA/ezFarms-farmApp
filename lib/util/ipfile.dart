@@ -1,4 +1,4 @@
-final String ipAddress = 'localhost';
+final String ipAddress = '172.24.239.38';
 // final String ipAddress = 'localhost';
 
 final String port = '8080';
@@ -13,6 +13,7 @@ final String getAllFarmersUrl = apiUrl('farmer');
 final String getAllInventory = apiUrl('inventory');
 final String postInventory = apiUrl('inventory');
 final String loginUrl = apiUrl('farmerLogin');
+final String registerFarmerUrl = apiUrl('farmer');
 final String getAllPayments = apiUrl('payment');
 
 

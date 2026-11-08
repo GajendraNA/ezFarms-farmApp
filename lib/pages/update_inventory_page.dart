@@ -1,9 +1,9 @@
-import 'package:farmer/util/ipfile.dart';
-import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:path/path.dart' as p;
+
+import 'package:farmer/util/inventory_form.dart';
+import 'package:farmer/util/ipfile.dart';
+import 'package:farmer/util/ui_helpers.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class UpdateInventoryPage extends StatefulWidget {
@@ -17,17 +17,8 @@ class UpdateInventoryPage extends StatefulWidget {
 
 class _UpdateInventoryPageState extends State<UpdateInventoryPage> {
   Map<String, dynamic>? inventory;
-
-  final _formKey = GlobalKey<FormState>();
-  final _weightController = TextEditingController();
-  final _remainingWeightController = TextEditingController();
-  final _finalRatePerKgController = TextEditingController();
-  final _itemNameController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  File? _selectedImage;
-
-
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -36,211 +27,60 @@ class _UpdateInventoryPageState extends State<UpdateInventoryPage> {
   }
 
   Future<void> getInventory() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final url = Uri.parse('${apiUrl('inventory')}/${widget.inventory_id}');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        Map<String, dynamic> data = json.decode(response.body);
-
-        setState(() {
-          inventory = data;
-          setValues(); // Set values after inventory is fetched
-        });
-      } else {
-        throw Exception('Failed to load item');
-      }
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) throw Exception('Status ${response.statusCode}');
+      inventory = json.decode(response.body);
     } catch (error) {
-      print('Error: $error');
+      debugPrint('Error: $error');
+      _error = kNetworkError;
     }
+    if (mounted) setState(() => _loading = false);
   }
 
-  void setValues() {
-    if (inventory != null) {
-      _weightController.text = inventory!['weight'].toString();
-      _remainingWeightController.text =
-          inventory!['remaining_weight'].toString();
-      _finalRatePerKgController.text =
-          inventory!['final_rate_per_kg'].toString();
-      _itemNameController.text = inventory!['item_name'];
-      _categoryController.text = inventory!['item_category'];
-      _descriptionController.text = inventory!['item_description'];
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    var pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    setState(() {
-      if (pickedFile != null) {
-        _selectedImage = File(pickedFile.path);
-      }
-    });
-  }
-
-  Future<void> _updateInv() async {
-    var url = Uri.parse('${apiUrl('fInventory')}/${widget.inventory_id}');
-    var request = http.MultipartRequest('PUT', url);
-
-    try {
-      Map<String, dynamic> requestData = {
-        "itemName": _itemNameController.text,
-        "weight": _weightController.text,
-        "remaining_weight": _remainingWeightController.text,
-        "final_rate_per_kg": _finalRatePerKgController.text,
-        "description": _descriptionController.text,
-        "category": _categoryController.text,
-      };
-
-      request.fields["data"] = jsonEncode(requestData);
-      if (_selectedImage != null && _selectedImage!.path.isNotEmpty) {
-        request.files.add(http.MultipartFile(
-          'file',
-          _selectedImage!.readAsBytes().asStream(),
-          _selectedImage!.lengthSync(),
-          filename: p.basename(_selectedImage!.path),
-        ));
-      }
-
-      var response = await request.send();
-
-      if (response.statusCode == 200) {
-        _showSnackBar(context, 'Inventory Updated Successfully');
-      } else {
-        _showSnackBar(context, 'Failed to Update Inventory');
-      }
-    } catch (err) {
-      _showSnackBar(context, 'Error: $err');
-    }
-  }
-
-  void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  Future<bool> _save(InventoryFormData data) async {
+    final error = await sendInventory(
+      method: 'PUT',
+      url: '${apiUrl('fInventory')}/${widget.inventory_id}',
+      data: data,
+      existingImageName: inventory?['name'],
     );
+    if (!mounted) return false;
+    if (error != null) {
+      showAppSnackBar(context, error, isError: true);
+      return false;
+    }
+    showAppSnackBar(context, 'Item updated');
+    Navigator.pop(context, true); // tell the previous page to refresh
+    return true;
   }
 
   @override
   Widget build(BuildContext context) {
+    final name = inventory?['name'];
     return Scaffold(
       appBar: AppBar(
-        title: Text('UPDATING...'),
+        title: const Text('UPDATE ITEM'),
         backgroundColor: Colors.green,
         shadowColor: Colors.black,
         elevation: 10,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _itemNameController,
-                decoration: InputDecoration(labelText: 'Item Name'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the item Name';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _categoryController,
-                decoration: InputDecoration(labelText: 'Item Category'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the category';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _finalRatePerKgController,
-                decoration: InputDecoration(labelText: 'Final Rate per KG'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the final rate per KG';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _weightController,
-                decoration: InputDecoration(labelText: 'Weight'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the weight';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _remainingWeightController,
-                decoration: InputDecoration(labelText: 'Remaining Weight'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the remaining weight';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(labelText: 'Item Description'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Write some description';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 20),
-              _selectedImage == null
-                  ? ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: inventory != null && inventory?['name'] != null
-                            ? Image.network(
-                                getImageUrl(inventory!['name']),
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: 200,
-                              )
-                            : Container(
-                                width: double.infinity,
-                                height: 200,
-                                color:
-                                    Colors.white, // or use a placeholder image
-                                child: Center(
-                                  child: Text(
-                                    'Loading the image',
-                                    style: TextStyle(color: Colors.black),
-                                  ),
-                                ),
-                              ),
-                      )
-                  : Image.file(_selectedImage!),
-              ElevatedButton(
-                onPressed: _pickImage,
-                child: Text('Pick Image'),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    _updateInv().then((_) {
-                      Navigator.pop(context,
-                          true); // Pass true to indicate update success
-                    });
-                  }
-                },
-                child: Text('Submit'),
-              ),
-            ],
-          ),
+      body: AsyncStateView(
+        isLoading: _loading,
+        error: _error,
+        isEmpty: inventory == null,
+        emptyMessage: 'Item not found',
+        onRetry: getInventory,
+        child: InventoryForm(
+          initial: inventory,
+          existingImageUrl: name == null ? null : getImageUrl(name),
+          submitLabel: 'Save Changes',
+          onSubmit: _save,
         ),
       ),
     );

@@ -1,12 +1,9 @@
 import 'dart:convert';
 import 'package:farmer/util/ipfile.dart'; // Ensure this file exists and getAllFarmersUrl is defined
-import 'package:farmer/pages/addInventoy_page.dart';
+import 'package:farmer/util/ui_helpers.dart';
 import 'package:farmer/pages/all_item_info_page.dart';
-import 'package:farmer/util/model.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:farmer/pages/login_page.dart';
 
 class AllInventoriesPage extends StatefulWidget {
   const AllInventoriesPage({
@@ -21,6 +18,9 @@ class _AllInventoriesPageState extends State<AllInventoriesPage> {
   List<Map<String, dynamic>> inventories = [];
   List<Map<String, dynamic>> filteredInventories = [];
   bool isLoading = true;
+  String? _error;
+  int? _sortColumn;
+  bool _sortAscending = true;
   TextEditingController searchController = TextEditingController();
 
   @override
@@ -30,8 +30,14 @@ class _AllInventoriesPageState extends State<AllInventoriesPage> {
   }
 
   Future<void> getAllInventories() async {
+    setState(() {
+      isLoading = inventories.isEmpty;
+      _error = null;
+    });
     try {
-      final response = await http.get(Uri.parse(getAllInventory));
+      final response = await http
+          .get(Uri.parse(getAllInventory))
+          .timeout(const Duration(seconds: 10));
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
@@ -68,147 +74,143 @@ class _AllInventoriesPageState extends State<AllInventoriesPage> {
       }
     } catch (error) {
       print('Error: $error');
+      if (!mounted) return;
       setState(() {
         isLoading = false;
+        _error = kNetworkError;
       });
-      // You can also show a SnackBar or other UI indication here
     }
+  }
+
+
+  void _openItem(Map<String, dynamic> inventory) {
+    if (inventory['inven_id'] == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AllItemInfoPage(inventory_id: inventory['inven_id']),
+      ),
+    ).then((changed) {
+      if (changed == true) getAllInventories();
+    });
+  }
+
+  DataColumn _column(String label, {bool numeric = false}) {
+    return DataColumn(
+      numeric: numeric,
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      onSort: onSortColumn,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    // Show more rows on tall/wide screens.
+    final rowsPerPage = width >= kWideLayoutBreakpoint ? 15 : 10;
+
     return Scaffold(
       appBar: AppBar(
-          title: const Text(
-            'INVENTORIES',
-          ),
+          title: const Text('ALL INVENTORIES'),
           backgroundColor: Colors.green,
           shadowColor: Colors.black,
           elevation: 10,
           actions: [
             IconButton(
-              icon: Icon(Icons.search),
+              tooltip: 'Search',
+              icon: const Icon(Icons.search),
               onPressed: () {
                 showSearch(
                     context: context,
-                    delegate: InventorySearch(filteredInventories));
+                    delegate: InventorySearch(inventories));
               },
             ),
           ]),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SingleChildScrollView(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.5),
-                        spreadRadius: 5,
-                        blurRadius: 7,
-                        offset: Offset(0, 3), // changes position of shadow
-                      ),
-                    ],
-                  ),
-                  child: PaginatedDataTable(
-                    columns: [
-                      DataColumn(
-                        label: Text('Item Name',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        onSort: (columnIndex, ascending) =>
-                            onSortColumn(columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Inventory Name',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        onSort: (columnIndex, ascending) =>
-                            onSortColumn(columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Weight',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        onSort: (columnIndex, ascending) =>
-                            onSortColumn(columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Remaining Weight',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        onSort: (columnIndex, ascending) =>
-                            onSortColumn(columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Final Rate per Kg',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        onSort: (columnIndex, ascending) =>
-                            onSortColumn(columnIndex, ascending),
-                      ),
-                    ],
-                    source: InventoryDataSource(filteredInventories),
-                    rowsPerPage: 10,
-                  ),
+      body: AsyncStateView(
+        isLoading: isLoading,
+        error: _error,
+        isEmpty: inventories.isEmpty,
+        emptyMessage: 'No inventories yet',
+        onRetry: getAllInventories,
+        child: RefreshIndicator(
+          onRefresh: getAllInventories,
+          child: ListView(
+            padding: const EdgeInsets.all(8.0),
+            children: [
+              ResponsiveCenter(
+                maxWidth: 1100,
+                // The table scrolls sideways on its own on narrow phones.
+                child: PaginatedDataTable(
+                  header: Text('${inventories.length} items  •  tap a row for details',
+                      style: const TextStyle(fontSize: 14)),
+                  sortColumnIndex: _sortColumn,
+                  sortAscending: _sortAscending,
+                  showCheckboxColumn: false,
+                  columnSpacing: 24,
+                  columns: [
+                    _column('Item'),
+                    _column('Farmer'),
+                    _column('Weight (kg)', numeric: true),
+                    _column('Left (kg)', numeric: true),
+                    _column('Rate (₹/kg)', numeric: true),
+                  ],
+                  source: InventoryDataSource(filteredInventories, _openItem),
+                  rowsPerPage: rowsPerPage,
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   void onSortColumn(int columnIndex, bool ascending) {
+    const keys = ['itemName', 'farmerName', 'weight', 'remainingWeight', 'finalRatePerKg'];
+    final key = keys[columnIndex];
+    final numeric = columnIndex >= 2;
+
     setState(() {
-      switch (columnIndex) {
-        case 0:
-          filteredInventories.sort(
-              (a, b) => compareString(ascending, a['itemName'], b['itemName']));
-          break;
-        case 1:
-          filteredInventories
-              .sort((a, b) => compareString(ascending, a['name'], b['name']));
-          break;
-        case 2:
-          filteredInventories.sort(
-              (a, b) => compareDouble(ascending, a['weight'], b['weight']));
-          break;
-        case 3:
-          filteredInventories.sort((a, b) => compareDouble(
-              ascending, a['remainingWeight'], b['remainingWeight']));
-          break;
-        case 4:
-          filteredInventories.sort((a, b) => compareDouble(
-              ascending, a['finalRatePerKg'], b['finalRatePerKg']));
-          break;
-      }
+      _sortColumn = columnIndex;
+      _sortAscending = ascending;
+      filteredInventories.sort((a, b) {
+        final result = numeric
+            ? toDouble(a[key]).compareTo(toDouble(b[key]))
+            : (a[key] ?? '').toString().toLowerCase().compareTo(
+                (b[key] ?? '').toString().toLowerCase());
+        return ascending ? result : -result;
+      });
     });
-  }
-
-  int compareString(bool ascending, String? a, String? b) {
-    return ascending ? a!.compareTo(b!) : b!.compareTo(a!);
-  }
-
-  int compareDouble(bool ascending, double? a, double? b) {
-    return ascending ? a!.compareTo(b!) : b!.compareTo(a!);
   }
 }
 
 class InventoryDataSource extends DataTableSource {
   final List<Map<String, dynamic>> inventories;
+  final void Function(Map<String, dynamic>) onTap;
 
-  InventoryDataSource(this.inventories);
+  InventoryDataSource(this.inventories, this.onTap);
 
   @override
   DataRow? getRow(int index) {
     assert(index >= 0);
     if (index >= inventories.length) return null;
     final inventory = inventories[index];
+    final left = toDouble(inventory['remainingWeight']);
     return DataRow.byIndex(
       index: index,
+      onSelectChanged: (_) => onTap(inventory),
       cells: [
         DataCell(Text(inventory['itemName'] ?? 'N/A')),
-        DataCell(Text(inventory['name'] ?? 'N/A')),
-        DataCell(Text(inventory['weight']?.toString() ?? 'N/A')),
-        DataCell(Text(inventory['remainingWeight']?.toString() ?? 'N/A')),
-        DataCell(Text(inventory['finalRatePerKg']?.toString() ?? 'N/A')),
+        DataCell(Text(inventory['farmerName'] ?? 'N/A')),
+        DataCell(Text(formatNum(inventory['weight']))),
+        DataCell(Text(
+          formatNum(left),
+          style: TextStyle(
+            color: left <= 0 ? Colors.red : null,
+            fontWeight: left <= 0 ? FontWeight.bold : null,
+          ),
+        )),
+        DataCell(Text(formatNum(inventory['finalRatePerKg']))),
       ],
     );
   }
