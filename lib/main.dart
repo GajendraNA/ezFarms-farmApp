@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
       ),
     ),),
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
+      title: 'EZ Farms Farmer',
       initialRoute: '/',
       routes: {
         '/': (context) => AuthCheck(),
