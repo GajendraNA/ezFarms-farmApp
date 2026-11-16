@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 import 'package:farmer/pages/all_payment_page.dart';
 import 'package:farmer/util/dialog_box.dart';
 import 'package:farmer/util/ipfile.dart';
@@ -42,7 +43,7 @@ class _HomePageState extends State<HomePage> {
     if (inventories.isEmpty) setState(() => _loading = true);
     try {
       final url = Uri.parse('${apiUrl('fInventory')}/${widget.userId}');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      final response = await http.get(url).waitForServer();
       if (response.statusCode != 200) {
         throw Exception('Status ${response.statusCode}');
       }
@@ -81,7 +82,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> getUserInfo() async {
     try {
       final url = Uri.parse('${apiUrl('farmer')}/${widget.userId}');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      final response = await http.get(url).waitForServer();
       if (response.statusCode == 200 && mounted) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         setState(() => userInfo = data);
