@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:farmer/util/server_wakeup.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -27,7 +28,7 @@ Future<String?> sendInventory({
     if (bytes == null && existingImageName != null) {
       final res = await http
           .get(Uri.parse(getImageUrl(existingImageName)))
-          .timeout(const Duration(seconds: 15));
+          .waitForServer();
       if (res.statusCode == 200) {
         bytes = res.bodyBytes;
         fileName = existingImageName;
@@ -40,7 +41,7 @@ Future<String?> sendInventory({
       ..files.add(http.MultipartFile.fromBytes('file', bytes,
           filename: fileName ?? 'item.jpg'));
 
-    final response = await request.send().timeout(const Duration(seconds: 30));
+    final response = await request.send().waitForServer();
     if (response.statusCode == 200) return null;
 
     final body = await response.stream.bytesToString();

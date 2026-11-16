@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:farmer/util/server_wakeup.dart';
 import 'dart:convert';
 import 'package:farmer/util/ipfile.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +65,7 @@ class _RegisterPageState extends State<RegisterPage> {
             },
             body: jsonEncode(farmer),
           )
-          .timeout(const Duration(seconds: 10));
+          .waitForServer();
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _showMessage("Registered successfully. Please log in.", success: true);

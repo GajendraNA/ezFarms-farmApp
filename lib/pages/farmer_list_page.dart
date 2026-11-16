@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 import 'package:farmer/util/ipfile.dart';
 import 'package:farmer/util/ui_helpers.dart';
 import 'package:flutter/material.dart';
@@ -50,7 +51,7 @@ class _PeopleListPageState extends State<PeopleListPage> {
       _error = null;
     });
     try {
-      final response = await http.get(Uri.parse(widget.url)).timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(widget.url)).waitForServer();
       if (response.statusCode != 200) throw Exception('Status ${response.statusCode}');
       final list = (json.decode(response.body) as List<dynamic>)
           .cast<Map<String, dynamic>>()

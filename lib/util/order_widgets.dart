@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 
 import 'package:farmer/util/ipfile.dart';
 import 'package:farmer/util/ui_helpers.dart';
@@ -117,7 +118,7 @@ class _RemoteListState extends State<_RemoteList> {
     });
     try {
       final response =
-          await http.get(Uri.parse(widget.url)).timeout(const Duration(seconds: 10));
+          await http.get(Uri.parse(widget.url)).waitForServer();
       // Some endpoints answer 204 (no content) when the list is empty.
       final List<dynamic> data = response.statusCode == 204 || response.body.trim().isEmpty
           ? []

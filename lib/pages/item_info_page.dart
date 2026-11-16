@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 
 import 'package:farmer/util/ipfile.dart';
 import 'package:farmer/pages/update_inventory_page.dart';
@@ -48,7 +49,7 @@ class _ItemInfoPageState extends State<ItemInfoPage> {
     });
     try {
       final url = Uri.parse('${apiUrl('inventory')}/${widget.inventory_id}');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      final response = await http.get(url).waitForServer();
       if (response.statusCode != 200) throw Exception('Status ${response.statusCode}');
       inventory = json.decode(response.body) as Map<String, dynamic>;
     } catch (error) {
@@ -75,7 +76,7 @@ class _ItemInfoPageState extends State<ItemInfoPage> {
     setState(() => _deleting = true);
     try {
       final url = Uri.parse('${apiUrl('inventory')}/${widget.inventory_id}');
-      final response = await http.delete(url).timeout(const Duration(seconds: 10));
+      final response = await http.delete(url).waitForServer();
       if (!mounted) return;
       if (response.statusCode == 200) {
         showAppSnackBar(context, '${inventory?['item_name'] ?? 'Item'} deleted');

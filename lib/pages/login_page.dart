@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:farmer/util/server_wakeup.dart';
 import 'dart:convert';
 import 'package:farmer/pages/register_page.dart';
 import 'package:farmer/util/ipfile.dart';
@@ -52,7 +53,7 @@ class _LoginPageState extends State<LoginPage> {
             },
             body: jsonEncode(checkLogin),
           )
-          .timeout(const Duration(seconds: 10));
+          .waitForServer();
 
       print('******************Login********************');
       print(response.body);

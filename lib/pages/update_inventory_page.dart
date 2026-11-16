@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 
 import 'package:farmer/util/inventory_form.dart';
 import 'package:farmer/util/ipfile.dart';
@@ -33,7 +34,7 @@ class _UpdateInventoryPageState extends State<UpdateInventoryPage> {
     });
     try {
       final url = Uri.parse('${apiUrl('inventory')}/${widget.inventory_id}');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      final response = await http.get(url).waitForServer();
       if (response.statusCode != 200) throw Exception('Status ${response.statusCode}');
       inventory = json.decode(response.body);
     } catch (error) {

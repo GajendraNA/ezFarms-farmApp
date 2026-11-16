@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:farmer/util/server_wakeup.dart';
 import 'package:farmer/util/ipfile.dart'; // Ensure this file exists and getAllFarmersUrl is defined
 import 'package:farmer/util/ui_helpers.dart';
 import 'package:farmer/pages/all_item_info_page.dart';
@@ -37,7 +38,7 @@ class _AllInventoriesPageState extends State<AllInventoriesPage> {
     try {
       final response = await http
           .get(Uri.parse(getAllInventory))
-          .timeout(const Duration(seconds: 10));
+          .waitForServer();
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');

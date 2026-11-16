@@ -1,10 +1,12 @@
 import 'package:farmer/util/bottom_navigation_bar_page.dart';
 import 'package:farmer/pages/login_page.dart';
+import 'package:farmer/util/server_wakeup.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
 void main() {
+  wakeUpServer();
   runApp(MyApp());
 }
 
@@ -12,6 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: scaffoldMessengerKey,
        theme: ThemeData(
     scaffoldBackgroundColor: Colors.green[50], 
     
